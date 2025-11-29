@@ -2,7 +2,9 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, MobileNetV2
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
+from tensorflow.keras.models import Model
 import pandas as pd
 import altair as alt
 import os
@@ -16,7 +18,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS agar lebih cantik
+# ============================
+#       CUSTOM CSS
+# ============================
 st.markdown("""
 <style>
     .title-box {
@@ -48,22 +52,22 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================
-#       JUDUL APLIKASI
+#       JUDUL
 # ============================
+st.markdown(
+    '<div class="title-box">🍏 Sistem Deteksi Penyakit Daun Apel - CNN (MobileNetV2) 🌿</div>',
+    unsafe_allow_html=True
+)
 
-st.markdown('<div class="title-box">🍏 Sistem Deteksi Penyakit Daun Apel - Convolutional Neural Network (CNN) 🌿</div>', unsafe_allow_html=True)
-st.write("")
 st.markdown("""
-Aplikasi ini menggunakan **Convolutional Neural Network (CNN) dengan arsitektur MobileNetV2**  
-untuk melakukan klasifikasi penyakit daun apel berdasarkan citra yang Anda unggah.  
-Aplikasi ini bertujuan membantu identifikasi dini penyakit tanaman secara cepat dan akurat. 🌱🔍
+Aplikasi ini menggunakan **Convolutional Neural Network (CNN)** dengan arsitektur **MobileNetV2**
+untuk mengklasifikasikan penyakit daun apel berdasarkan citra yang diunggah.
 """)
 
 # ============================
-#       LOAD MODEL
+#       KONFIGURASI MODEL
 # ============================
-
-MODEL_PATH = "apple_leaf_cnn_fixed.keras"
+MODEL_WEIGHTS = "apple_leaf_cnn_best.h5"
 
 CLASS_NAMES = [
     "Alternaria leaf spot",
@@ -74,99 +78,85 @@ CLASS_NAMES = [
 ]
 
 DISEASE_INFO = {
-    "Alternaria leaf spot": "🟤 Disebabkan oleh *Alternaria mali*. Ditandai bercak coklat gelap berbentuk bulat/tidak beraturan.",
-    "Brown spot": "🟤 Bercak coklat pada daun akibat infeksi jamur. Biasanya muncul saat kelembapan tinggi.",
-    "Gray spot": "⚪ Bercak abu-abu dengan tepi gelap. Sering muncul akibat patogen daun.",
-    "Healthy leaf": "🌿 Daun sehat tanpa tanda penyakit. Kondisi optimal!",
-    "Rust": "🧡 Bercak jingga/merah akibat jamur *Gymnosporangium*. Umumnya menyerang daun muda."
+    "Alternaria leaf spot": "🟤 Disebabkan oleh *Alternaria mali*.",
+    "Brown spot": "🟤 Bercak coklat akibat infeksi jamur.",
+    "Gray spot": "⚪ Bercak abu-abu dengan tepi gelap.",
+    "Healthy leaf": "🌿 Daun sehat tanpa tanda penyakit.",
+    "Rust": "🧡 Bercak jingga akibat jamur *Gymnosporangium*."
 }
 
+# ============================
+#       BUILD MODEL (ULANG)
+# ============================
+def build_model(num_classes=5):
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights=None
+    )
+    x = base_model.output
+    x = GlobalAveragePooling2D()(x)
+    output = Dense(num_classes, activation="softmax")(x)
+    model = Model(inputs=base_model.input, outputs=output)
+    return model
+
+# ============================
+#       LOAD WEIGHTS
+# ============================
+@st.cache_resource
 def load_model():
-    if os.path.exists(MODEL_PATH):
-        return tf.keras.models.load_model(
-            MODEL_PATH,
-            compile=False,
-            safe_mode=False
-        )
-    return None
+    model = build_model(num_classes=len(CLASS_NAMES))
+    model.load_weights(MODEL_WEIGHTS)
+    return model
 
 model = load_model()
 
-if model is None:
-    st.error("❌ Model tidak ditemukan!")
-else:
+# ============================
+#       UPLOAD & PREDIKSI
+# ============================
+st.write("## 📤 Upload Gambar Daun Apel")
+uploaded_file = st.file_uploader(
+    "Unggah gambar (.jpg, .jpeg, .png)",
+    type=["jpg", "jpeg", "png"]
+)
 
-    # ============================
-    #       UPLOAD IMAGE
-    # ============================
+if uploaded_file:
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption="Gambar Daun", width=350)
 
-    st.write("## 📤 Upload Gambar Daun Apel")
-    uploaded_file = st.file_uploader("Unggah file gambar (.jpg, .jpeg, .png)", type=["jpg", "jpeg", "png"])
+    img = image.resize((224, 224))
+    img = preprocess_input(np.array(img))
+    img = np.expand_dims(img, axis=0)
 
-    if uploaded_file:
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="Gambar Diunggah", width=350)
+    preds = model.predict(img)[0]
+    sorted_idx = np.argsort(preds)[::-1]
 
-        img = image.resize((224, 224))
-        img = preprocess_input(np.array(img))
-        img = np.expand_dims(img, axis=0)
+    predicted_label = CLASS_NAMES[sorted_idx[0]]
+    confidence = preds[sorted_idx[0]]
 
-        preds = model.predict(img)[0]
+    st.markdown(
+        f"""
+        <div class="prediction-box">
+            <h3>🎯 Prediksi: <b>{predicted_label}</b></h3>
+            <h4>🔢 Tingkat Kepercayaan: <b>{confidence*100:.2f}%</b></h4>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        # Sorting probabilitas
-        sorted_idx = np.argsort(preds)[::-1]
-        sorted_labels = [CLASS_NAMES[i] for i in sorted_idx]
-        sorted_probs = preds[sorted_idx]
+    st.markdown("## 🩺 Informasi Penyakit")
+    st.markdown(
+        f"<div class='info-card'>{DISEASE_INFO[predicted_label]}</div>",
+        unsafe_allow_html=True
+    )
 
-        predicted_label = sorted_labels[0]
-        confidence = sorted_probs[0]
+    st.markdown("## 📊 Grafik Probabilitas")
+    df_probs = pd.DataFrame({
+        "Kelas": CLASS_NAMES,
+        "Probabilitas": preds
+    })
 
-        # ============================
-        #       BOX PREDIKSI
-        # ============================
-
-        st.markdown(
-            f"""
-            <div class="prediction-box">
-                <h3>🎯 Prediksi: <b>{predicted_label}</b></h3>
-                <h4>🔢 Tingkat kepercayaan: <b>{confidence*100:.2f}%</b></h4>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        # ============================
-        #       INFO PENYAKIT
-        # ============================
-
-        st.markdown("## 🩺 Informasi Penyakit")
-        st.markdown(f"<div class='info-card'>{DISEASE_INFO[predicted_label]}</div>", unsafe_allow_html=True)
-
-        # ============================
-        #     GRAFIK PROBABILITAS
-        # ============================
-
-        st.markdown("## 📊 Grafik Probabilitas Kelas")
-
-        df_probs = pd.DataFrame({
-            "Kelas": sorted_labels,
-            "Probabilitas": sorted_probs
-        })
-
-        chart = (
-            alt.Chart(df_probs)
-            .mark_bar()
-            .encode(
-                x=alt.X("Probabilitas:Q", title="Nilai Probabilitas"),
-                y=alt.Y("Kelas:N", sort="-x", title="Kelas Penyakit"),
-                color=alt.Color("Probabilitas", scale=alt.Scale(scheme="greens")),
-                tooltip=["Kelas", "Probabilitas"]
-            )
-            .properties(width=700, height=300)
-        )
-
-
-        st.altair_chart(chart, use_container_width=True)
-
-
-
+    chart = (
+        alt.Chart(df_probs)
+        .mark_bar()
+        .encode(
