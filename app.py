@@ -84,7 +84,7 @@ DISEASE_INFO = {
 @st.cache_resource
 def load_model():
     if os.path.exists(MODEL_PATH):
-        return tf.keras.models.load_model(MODEL_PATH)
+        return tf.keras.models.load_model(MODEL_PATH, compile=False)
     return None
 
 model = load_model()
@@ -161,5 +161,6 @@ else:
             )
             .properties(width=700, height=300)
         )
+
 
         st.altair_chart(chart, use_container_width=True)
