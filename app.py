@@ -2,9 +2,6 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-from tensorflow.keras.models import Model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 import pandas as pd
 import altair as alt
@@ -32,28 +29,15 @@ CLASS_NAMES = [
     "Rust"
 ]
 
-def build_model():
-    base_model = MobileNetV2(
-        weights="imagenet",
-        include_top=False,
-        input_shape=(224, 224, 3)
-    )
-    base_model.trainable = False
-
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    x = Dense(128, activation="relu")(x)
-    outputs = Dense(len(CLASS_NAMES), activation="softmax")(x)
-
-    model = Model(inputs=base_model.input, outputs=outputs)
-    model.load_weights(MODEL_PATH)
-    return model
-
 if not os.path.exists(MODEL_PATH):
-    st.error("❌ File model tidak ditemukan")
+    st.error("❌ Model tidak ditemukan")
     st.stop()
 
-model = build_model()
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model(MODEL_PATH)
+
+model = load_model()
 
 st.subheader("📤 Upload Gambar Daun Apel")
 file = st.file_uploader("Upload gambar (.jpg/.png)", type=["jpg", "png", "jpeg"])
@@ -68,8 +52,8 @@ if file:
     img = np.expand_dims(img, axis=0)
 
     preds = model.predict(img)[0]
-
     idx = np.argmax(preds)
+
     st.success(f"🎯 Prediksi: **{CLASS_NAMES[idx]}**")
     st.write(f"🔢 Probabilitas: **{preds[idx]*100:.2f}%**")
 
@@ -79,8 +63,9 @@ if file:
     })
 
     chart = alt.Chart(df).mark_bar().encode(
-        x="Probabilitas",
-        y=alt.Y("Kelas", sort="-x")
+        x=alt.X("Probabilitas:Q", title="Nilai Probabilitas"),
+        y=alt.Y("Kelas:N", sort="-x"),
+        tooltip=["Kelas", "Probabilitas"]
     )
 
     st.altair_chart(chart, use_container_width=True)
