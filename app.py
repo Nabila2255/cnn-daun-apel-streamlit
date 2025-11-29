@@ -81,7 +81,6 @@ DISEASE_INFO = {
     "Rust": "🧡 Bercak jingga/merah akibat jamur *Gymnosporangium*. Umumnya menyerang daun muda."
 }
 
-@st.cache_resource
 def load_model():
     if os.path.exists(MODEL_PATH):
         return tf.keras.models.load_model(MODEL_PATH, compile=False)
@@ -164,4 +163,5 @@ else:
 
 
         st.altair_chart(chart, use_container_width=True)
+
 
