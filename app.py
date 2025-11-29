@@ -83,7 +83,11 @@ DISEASE_INFO = {
 
 def load_model():
     if os.path.exists(MODEL_PATH):
-        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+        return tf.keras.models.load_model(
+            MODEL_PATH,
+            compile=False,
+            safe_mode=False
+        )
     return None
 
 model = load_model()
@@ -163,5 +167,6 @@ else:
 
 
         st.altair_chart(chart, use_container_width=True)
+
 
 
