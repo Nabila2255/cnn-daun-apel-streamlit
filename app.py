@@ -83,7 +83,7 @@ st.write("")
 # ============================
 # MODEL CONFIG
 # ============================
-MODEL_PATH = "apple_leaf_cnn_final.h5"
+MODEL_PATH = "apple_leaf_cnn_best.h5"
 
 CLASS_NAMES = [
     "Alternaria leaf spot",
@@ -188,4 +188,5 @@ if model:
 
 else:
     st.stop()
+
 
