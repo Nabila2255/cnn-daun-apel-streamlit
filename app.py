@@ -62,7 +62,7 @@ Aplikasi ini bertujuan membantu identifikasi dini penyakit tanaman secara cepat 
 #       LOAD MODEL
 # ============================
 
-MODEL_PATH = "apple_leaf_cnn_best.h5"
+MODEL_PATH = "apple_leaf_cnn_final.h5"
 
 CLASS_NAMES = [
     "Alternaria leaf spot",
@@ -174,3 +174,4 @@ else:
             
         except Exception as e:
             st.error(f"Terjadi kesalahan saat memproses gambar: {e}")
+
