@@ -1,6 +1,6 @@
 streamlit
 numpy
-pandas
 pillow
+pandas
 altair
-tensorflow==2.15.0
+tensorflow-cpu==2.12.0
